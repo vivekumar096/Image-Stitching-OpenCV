@@ -9,7 +9,7 @@ class Image_Stitching():
         self.sift=cv2.xfeatures2d.SIFT_create()
         self.smoothing_window_size=800
 
-    def registration(self,img1,img2):
+    def registration(self,img1,img2,desc):
         kp1, des1 = self.sift.detectAndCompute(img1, None)
         kp2, des2 = self.sift.detectAndCompute(img2, None)
         matcher = cv2.BFMatcher()
@@ -22,6 +22,9 @@ class Image_Stitching():
                 good_matches.append([m1])
         img3 = cv2.drawMatchesKnn(img1, kp1, img2, kp2, good_matches, None, flags=2)
         cv2.imwrite('matching.jpg', img3)
+
+        print(f"[{desc}] Number of matched keypoints: {len(good_points)}")
+
         if len(good_points) > self.min_match:
             image1_kp = np.float32(
                 [kp1[i].pt for (_, i) in good_points])
@@ -47,8 +50,8 @@ class Image_Stitching():
             mask[:, barrier + offset:] = 1
         return cv2.merge([mask, mask, mask])
 
-    def blending(self,img1,img2):
-        H = self.registration(img1,img2)
+    def blending(self,img1,img2,desc):
+        H = self.registration(img1,img2,desc)
         height_img1 = img1.shape[0]
         width_img1 = img1.shape[1]
         width_img2 = img2.shape[1]
@@ -68,16 +71,33 @@ class Image_Stitching():
         min_col, max_col = min(cols), max(cols) + 1
         final_result = result[min_row:max_row, min_col:max_col, :]
         return final_result
-def main(argv1,argv2):
+def main(argv1, argv2):
     img1 = cv2.imread(argv1)
     img2 = cv2.imread(argv2)
-    final=Image_Stitching().blending(img1,img2)
-    cv2.imwrite('panorama.jpg', final)
+    img1_grey = cv2.imread(argv1, cv2.IMREAD_GRAYSCALE)
+    img2_grey = cv2.imread(argv2, cv2.IMREAD_GRAYSCALE)
+
+    # Apply Canny edge detection
+    img1_Canny = cv2.Canny(img1_grey, 100, 200)
+    img2_Canny = cv2.Canny(img2_grey, 100, 200)
+
+    # Convert back to 3-channel image (as SIFT requires color images)
+    img1_Canny = cv2.cvtColor(img1_Canny, cv2.COLOR_GRAY2BGR)
+    img2_Canny = cv2.cvtColor(img2_Canny, cv2.COLOR_GRAY2BGR)
+
+    final = Image_Stitching().blending(img1, img2,"Original")
+
+    if final is not None:
+        cv2.imwrite('panorama.jpg', final)
+
+    final_Canny = Image_Stitching().blending(img1_Canny, img2_Canny,"Canny")
+
+    if final_Canny is not None:
+        cv2.imwrite('panorama_Canny.jpg', final_Canny)
+
 if __name__ == '__main__':
     try: 
-        main(sys.argv[1],sys.argv[2])
+        main(sys.argv[1], sys.argv[2])
     except IndexError:
-        print ("Please input two source images: ")
-        print ("For example: python Image_Stitching.py '/Users/linrl3/Desktop/picture/p1.jpg' '/Users/linrl3/Desktop/picture/p2.jpg'")
-    
-
+        print("Please input two source images: ")
+        print("For example: python Image_Stitching.py 'image1.jpg' 'image2.jpg'")
