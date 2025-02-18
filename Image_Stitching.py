@@ -70,7 +70,9 @@ class Image_Stitching():
         return final_result
 def main(argv1,argv2):
     img1 = cv2.imread(argv1)
+    img1 = cv2.Canny(img1)
     img2 = cv2.imread(argv2)
+    img2 = cv2.Canny(img2)
     final=Image_Stitching().blending(img1,img2)
     cv2.imwrite('panorama.jpg', final)
 if __name__ == '__main__':
